@@ -981,14 +981,19 @@ impl Session {
         payload: ZBuf,
     ) {
         let state = zread!(self.state);
+        debug!("ciao 1");
         if let ResKey::RId(rid) = reskey {
+            debug!("ciao 2");
             match state.get_res(rid, local) {
                 Some(res) => {
                     if !local && res.subscribers.len() == 1 {
+                        debug!("ciao 3");
                         let sub = res.subscribers.get(0).unwrap();
                         Session::invoke_subscriber(&sub.invoker, res.name.clone(), payload, info);
                     } else {
+                        debug!("ciao 4");
                         if !local || state.local_routing {
+                            debug!("ciao 5");
                             for sub in &res.subscribers {
                                 Session::invoke_subscriber(
                                     &sub.invoker,
@@ -999,6 +1004,7 @@ impl Session {
                             }
                         }
                         if local {
+                            debug!("ciao 6");
                             for sub in &res.local_subscribers {
                                 Session::invoke_subscriber(
                                     &sub.invoker,
@@ -1015,8 +1021,10 @@ impl Session {
                 }
             }
         } else {
+            debug!("ciao 7");
             match state.reskey_to_resname(reskey, local) {
                 Ok(resname) => {
+                    debug!("ciao 8");
                     if !local || state.local_routing {
                         for sub in state.subscribers.values() {
                             if rname::matches(&sub.resname, &resname) {
@@ -1030,6 +1038,7 @@ impl Session {
                         }
                     }
                     if local {
+                        debug!("ciao 9");
                         for sub in state.local_subscribers.values() {
                             if rname::matches(&sub.resname, &resname) {
                                 Session::invoke_subscriber(
