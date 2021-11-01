@@ -1092,6 +1092,7 @@ macro_rules! send_to_first {
 macro_rules! send_to_all {
     ($route:expr, $srcface:expr, $payload:expr, $channel:expr, $cong_ctrl:expr, $data_info:expr) => {
         for (outface, reskey, context) in $route.values() {
+            log::debug!("ciao 7:{:?}",$route.values().len());
             if $srcface.id != outface.id {
                 outface
                     .primitives
