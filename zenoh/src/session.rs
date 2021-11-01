@@ -993,7 +993,7 @@ impl Session {
                     } else {
                         debug!("ciao 4");
                         if !local || state.local_routing {
-                            debug!("ciao 5:{:?}", res.subscribers);
+                            debug!("ciao 5:{:?}", res.subscribers.len());
                             for sub in &res.subscribers {
                                 Session::invoke_subscriber(
                                     &sub.invoker,
@@ -1004,7 +1004,7 @@ impl Session {
                             }
                         }
                         if local {
-                            debug!("ciao 6:{:?}", res.local_subscribers);
+                            debug!("ciao 6:{:?}", res.local_subscribers.len());
                             for sub in &res.local_subscribers {
                                 Session::invoke_subscriber(
                                     &sub.invoker,
