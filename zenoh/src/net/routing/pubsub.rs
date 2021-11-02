@@ -1139,6 +1139,7 @@ pub fn route_data(
     payload: ZBuf,
     routing_context: Option<RoutingContext>,
 ) {
+    log::debug!("ciao 9");
     match tables.get_mapping(face, &rid).cloned() {
         Some(prefix) => {
             log::trace!("Route data for res {}{}", prefix.name(), suffix);
@@ -1181,6 +1182,7 @@ pub fn full_reentrant_route_data(
     payload: ZBuf,
     routing_context: Option<RoutingContext>,
 ) {
+    log::debug!("ciao 10");
     let tables = zread!(tables_ref);
     match tables.get_mapping(face, &rid).cloned() {
         Some(prefix) => {
