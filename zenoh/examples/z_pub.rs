@@ -27,7 +27,9 @@ async fn main() {
     let session = zenoh::open(config).await.unwrap();
 
     print!("Register Resource {}", path);
-    let rid = session.register_resource(&path).await.unwrap();
+    //let rid = session.register_resource(&path).await.unwrap();
+    let rid = session.register_resource_group(&path, "all").await.unwrap();
+
     println!(" => RId {}", rid);
 
     println!("Register Publisher on {}", rid);

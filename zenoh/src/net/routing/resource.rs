@@ -47,6 +47,33 @@ pub(super) struct SessionContext {
     pub(super) last_values: HashMap<String, (Option<DataInfo>, ZBuf)>,
 }
 
+pub(super) struct Groups {
+    groups: HashMap<u8, HashSet<PeerId>>,
+}
+
+impl Groups {
+    fn new() -> Groups {
+        Groups {
+            groups: HashMap::new(),
+        }
+    }
+}
+
+pub enum Grouped {
+    disabled,
+    all,
+    groups,
+}
+
+pub(super) struct GroupsRoute {
+    routes: Vec<Arc<Route>>,
+}
+impl GroupsRoute {
+    fn new() -> GroupsRoute {
+        GroupsRoute { routes: Vec::new() }
+    }
+}
+
 pub(super) struct ResourceContext {
     pub(super) router_subs: HashSet<PeerId>,
     pub(super) peer_subs: HashSet<PeerId>,
@@ -60,6 +87,9 @@ pub(super) struct ResourceContext {
     pub(super) routers_query_routes: Vec<Arc<TargetQablSet>>,
     pub(super) peers_query_routes: Vec<Arc<TargetQablSet>>,
     pub(super) client_query_route: Option<Arc<TargetQablSet>>,
+    pub(super) grouped: Grouped,
+    pub(super) groups: Groups,
+    pub(super) group_routes: GroupsRoute,
 }
 
 impl ResourceContext {
@@ -77,6 +107,9 @@ impl ResourceContext {
             routers_query_routes: Vec::new(),
             peers_query_routes: Vec::new(),
             client_query_route: None,
+            grouped: Grouped::disabled,
+            groups: Groups::new(),
+            group_routes: GroupsRoute::new(),
         }
     }
 }

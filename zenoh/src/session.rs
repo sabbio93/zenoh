@@ -18,6 +18,7 @@ use super::queryable::*;
 use super::subscriber::*;
 use super::*;
 use crate::config::{Config, Notifier};
+use crate::net::routing::router::Grouped;
 use async_std::sync::Arc;
 use async_std::task;
 use flume::{bounded, Sender};
@@ -174,6 +175,7 @@ pub(crate) struct Resource {
     pub(crate) name: String,
     pub(crate) subscribers: Vec<Arc<SubscriberState>>,
     pub(crate) local_subscribers: Vec<Arc<SubscriberState>>,
+    pub(crate) grouped: Grouped,
 }
 
 impl Resource {
@@ -182,6 +184,16 @@ impl Resource {
             name,
             subscribers: vec![],
             local_subscribers: vec![],
+            grouped: Grouped::disabled,
+        }
+    }
+
+    pub(crate) fn createWGroup(name: String, grouped: Grouped) -> Resource {
+        Resource {
+            name,
+            subscribers: vec![],
+            local_subscribers: vec![],
+            grouped,
         }
     }
 }
@@ -420,10 +432,12 @@ impl Session {
     /// let rid = session.register_resource("/resource/name").await.unwrap();
     /// # })
     /// ```
+
     #[must_use = "ZFutures do nothing unless you `.wait()`, `.await` or poll them"]
-    pub fn register_resource<'a, IntoResKey>(
+    fn register_resource_grp<'a, IntoResKey>(
         &self,
         resource: IntoResKey,
+        grouped: Grouped,
     ) -> impl ZFuture<Output = ZResult<ResourceId>>
     where
         IntoResKey: Into<ResKey<'a>>,
@@ -441,7 +455,9 @@ impl Session {
                 Some((rid, _res)) => *rid,
                 None => {
                     let rid = state.rid_counter.fetch_add(1, Ordering::SeqCst) as ZInt;
-                    let mut res = Resource::new(resname.clone());
+                    //let mut res = Resource::new(resname.clone());
+                    let mut res = Resource::createWGroup(resname.clone(), grouped);
+
                     for sub in state.subscribers.values() {
                         if rname::matches(&resname, &sub.resname) {
                             res.subscribers.push(sub.clone());
@@ -458,6 +474,33 @@ impl Session {
                 }
             }
         }))
+    }
+
+    #[must_use = "ZFutures do nothing unless you `.wait()`, `.await` or poll them"]
+    pub fn register_resource<'a, IntoResKey>(
+        &self,
+        resource: IntoResKey,
+    ) -> impl ZFuture<Output = ZResult<ResourceId>>
+    where
+        IntoResKey: Into<ResKey<'a>>,
+    {
+        self.register_resource_grp(resource, Grouped::disabled)
+    }
+
+    #[must_use = "ZFutures do nothing unless you `.wait()`, `.await` or poll them"]
+    pub fn register_resource_group<'a, IntoResKey>(
+        &self,
+        resource: IntoResKey,
+        grp_method: &str,
+    ) -> impl ZFuture<Output = ZResult<ResourceId>>
+    where
+        IntoResKey: Into<ResKey<'a>>,
+    {
+        match grp_method {
+            "all" => self.register_resource_grp(resource, Grouped::all),
+            "disabled" => self.register_resource_grp(resource, Grouped::disabled),
+            _ => self.register_resource_grp(resource, Grouped::disabled),
+        }
     }
 
     /// Undeclare the *numerical Id/resource key* association previously declared

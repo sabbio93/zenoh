@@ -13,11 +13,14 @@
 //
 use async_std::sync::Arc;
 use petgraph::graph::NodeIndex;
+use rand::Rng;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 use zenoh_util::sync::get_mut_unchecked;
 use zenoh_util::zread;
+
+use crate::net::routing::router::Grouped;
 
 use super::protocol::core::{
     Channel, CongestionControl, PeerId, Priority, Reliability, SubInfo, SubMode, WhatAmI, ZInt,
@@ -1089,6 +1092,24 @@ macro_rules! send_to_first {
     }
 }
 
+macro_rules! send_to_one {
+    ($route:expr, $srcface:expr, $payload:expr, $channel:expr, $cong_ctrl:expr, $data_info:expr) => {
+        let (outface, reskey, context) = $route.unwrap();
+        if $srcface.id != outface.id {
+            outface
+                .primitives
+                .send_data(
+                    &reskey,
+                    $payload,
+                    $channel, // @TODO: Need to check the active subscriptions to determine the right reliability value
+                    $cong_ctrl,
+                    $data_info,
+                    *context,
+                )
+        }
+    }
+}
+
 macro_rules! send_to_all {
     ($route:expr, $srcface:expr, $payload:expr, $channel:expr, $cong_ctrl:expr, $data_info:expr) => {
         for (outface, reskey, context) in $route.values() {
@@ -1159,7 +1180,24 @@ pub fn route_data(
                         cache_data!(matching_pulls, prefix, suffix, payload, data_info);
                         drop(lock);
                     }
-                    send_to_all!(route, face, payload, channel, congestion_control, data_info);
+                    match res.unwrap().context().grouped {
+                        Grouped::all => {
+                            log::debug!("send to one");
+                            let mut rng = rand::thread_rng();
+                            let chsn = rng.gen_range(0..route.len());
+                            let rt = route.get(&chsn);
+
+                            send_to_one!(rt, face, payload, channel, congestion_control, data_info);
+                        }
+                        _ => send_to_all!(
+                            route,
+                            face,
+                            payload,
+                            channel,
+                            congestion_control,
+                            data_info
+                        ),
+                    }
                 }
             }
         }
