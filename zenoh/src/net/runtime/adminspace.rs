@@ -1,3 +1,5 @@
+use crate::net::routing::router::Grouped;
+
 //
 // Copyright (c) 2017, 2020 ADLINK Technology Inc.
 //
@@ -118,7 +120,7 @@ impl AdminSpace {
 }
 
 impl Primitives for AdminSpace {
-    fn decl_resource(&self, rid: ZInt, reskey: &ResKey) {
+    fn decl_resource(&self, rid: ZInt, reskey: &ResKey, grouped: Grouped) {
         trace!("recv Resource {} {:?}", rid, reskey);
         match self.reskey_to_string(reskey) {
             Some(s) => {

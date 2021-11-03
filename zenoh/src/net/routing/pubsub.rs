@@ -168,7 +168,7 @@ pub fn declare_router_subscription(
 ) {
     match tables.get_mapping(face, &prefixid).cloned() {
         Some(mut prefix) => {
-            let mut res = Resource::make_resource(tables, &mut prefix, suffix);
+            let mut res = Resource::make_resource(tables, &mut prefix, suffix, Grouped::disabled);
             Resource::match_resource(tables, &mut res);
             register_router_subscription(tables, face, &mut res, sub_info, router);
 
@@ -208,7 +208,7 @@ pub fn declare_peer_subscription(
 ) {
     match tables.get_mapping(face, &prefixid).cloned() {
         Some(mut prefix) => {
-            let mut res = Resource::make_resource(tables, &mut prefix, suffix);
+            let mut res = Resource::make_resource(tables, &mut prefix, suffix, Grouped::disabled);
             Resource::match_resource(tables, &mut res);
             register_peer_subscription(tables, face, &mut res, sub_info, peer);
 
@@ -272,7 +272,7 @@ pub fn declare_client_subscription(
 ) {
     match tables.get_mapping(face, &prefixid).cloned() {
         Some(mut prefix) => {
-            let mut res = Resource::make_resource(tables, &mut prefix, suffix);
+            let mut res = Resource::make_resource(tables, &mut prefix, suffix, Grouped::disabled);
             Resource::match_resource(tables, &mut res);
 
             register_client_subscription(tables, face, &mut res, sub_info);
@@ -1242,8 +1242,40 @@ pub fn full_reentrant_route_data(
                         cache_data!(matching_pulls, prefix, suffix, payload, data_info);
                         drop(lock);
                     }
-                    drop(tables);
-                    send_to_all!(route, face, payload, channel, congestion_control, data_info);
+                    log::debug!(
+                        "setted grouped:{:?}",
+                        res.clone().unwrap().context().grouped
+                    );
+
+                    if res.is_none() {
+                        send_to_all!(route, face, payload, channel, congestion_control, data_info)
+                    } else {
+                        match res.unwrap().context().grouped {
+                            Grouped::all => {
+                                log::debug!("send to one");
+                                let mut rng = rand::thread_rng();
+                                let chsn = rng.gen_range(0..route.len());
+                                let rt = route.get(&chsn);
+
+                                send_to_one!(
+                                    rt,
+                                    face,
+                                    payload,
+                                    channel,
+                                    congestion_control,
+                                    data_info
+                                );
+                            }
+                            _ => send_to_all!(
+                                route,
+                                face,
+                                payload,
+                                channel,
+                                congestion_control,
+                                data_info
+                            ),
+                        }
+                    }
                 }
             }
         }

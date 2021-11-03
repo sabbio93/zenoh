@@ -14,6 +14,8 @@
 mod demux;
 mod mux;
 
+use crate::net::routing::router::Grouped;
+
 use super::protocol;
 use super::protocol::core::{
     Channel, CongestionControl, PeerId, QueryConsolidation, QueryTarget, QueryableInfo, ResKey,
@@ -25,7 +27,7 @@ pub use demux::*;
 pub use mux::*;
 
 pub trait Primitives: Send + Sync {
-    fn decl_resource(&self, rid: ZInt, reskey: &ResKey);
+    fn decl_resource(&self, rid: ZInt, reskey: &ResKey, grouped: Grouped);
     fn forget_resource(&self, rid: ZInt);
 
     fn decl_publisher(&self, reskey: &ResKey, routing_context: Option<RoutingContext>);
@@ -100,7 +102,7 @@ impl DummyPrimitives {
 }
 
 impl Primitives for DummyPrimitives {
-    fn decl_resource(&self, _rid: ZInt, _reskey: &ResKey) {}
+    fn decl_resource(&self, _rid: ZInt, _reskey: &ResKey, grouped: Grouped) {}
     fn forget_resource(&self, _rid: ZInt) {}
 
     fn decl_publisher(&self, _reskey: &ResKey, _routing_context: Option<RoutingContext>) {}

@@ -18,8 +18,10 @@ use super::protocol::io::ZBuf;
 use super::protocol::proto::{DataInfo, RoutingContext};
 use super::router::Tables;
 use async_std::sync::{Arc, Weak};
+use nix::unistd::Group;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use zenoh_util::sync::get_mut_unchecked;
 
@@ -59,6 +61,7 @@ impl Groups {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Grouped {
     disabled,
     all,
@@ -93,7 +96,7 @@ pub(super) struct ResourceContext {
 }
 
 impl ResourceContext {
-    fn new() -> ResourceContext {
+    fn new(grouped: Grouped) -> ResourceContext {
         ResourceContext {
             router_subs: HashSet::new(),
             peer_subs: HashSet::new(),
@@ -107,7 +110,7 @@ impl ResourceContext {
             routers_query_routes: Vec::new(),
             peers_query_routes: Vec::new(),
             client_query_route: None,
-            grouped: Grouped::disabled,
+            grouped,
             groups: Groups::new(),
             group_routes: GroupsRoute::new(),
         }
@@ -291,9 +294,10 @@ impl Resource {
         tables: &mut Tables,
         from: &mut Arc<Resource>,
         suffix: &str,
+        grouped: Grouped,
     ) -> Arc<Resource> {
         if suffix.is_empty() {
-            Resource::upgrade_resource(from);
+            Resource::upgrade_resource(from, grouped);
             from.clone()
         } else if let Some(stripped_suffix) = suffix.strip_prefix('/') {
             let (chunk, rest) = match stripped_suffix.find('/') {
@@ -302,13 +306,13 @@ impl Resource {
             };
 
             match get_mut_unchecked(from).childs.get_mut(chunk) {
-                Some(mut res) => Resource::make_resource(tables, &mut res, rest),
+                Some(mut res) => Resource::make_resource(tables, &mut res, rest, grouped),
                 None => {
                     let mut new = Arc::new(Resource::new(from, chunk, None));
                     if log::log_enabled!(log::Level::Debug) && rest.is_empty() {
                         log::debug!("Register resource {}", new.name());
                     }
-                    let res = Resource::make_resource(tables, &mut new, rest);
+                    let res = Resource::make_resource(tables, &mut new, rest, grouped);
                     get_mut_unchecked(from)
                         .childs
                         .insert(String::from(chunk), new);
@@ -317,9 +321,12 @@ impl Resource {
             }
         } else {
             match from.parent.clone() {
-                Some(mut parent) => {
-                    Resource::make_resource(tables, &mut parent, &[&from.suffix, suffix].concat())
-                }
+                Some(mut parent) => Resource::make_resource(
+                    tables,
+                    &mut parent,
+                    &[&from.suffix, suffix].concat(),
+                    grouped,
+                ),
                 None => {
                     let (chunk, rest) = match suffix[1..].find('/') {
                         Some(idx) => (&suffix[0..(idx + 1)], &suffix[(idx + 1)..]),
@@ -327,13 +334,13 @@ impl Resource {
                     };
 
                     match get_mut_unchecked(from).childs.get_mut(chunk) {
-                        Some(mut res) => Resource::make_resource(tables, &mut res, rest),
+                        Some(mut res) => Resource::make_resource(tables, &mut res, rest, grouped),
                         None => {
                             let mut new = Arc::new(Resource::new(from, chunk, None));
                             if log::log_enabled!(log::Level::Debug) && rest.is_empty() {
                                 log::debug!("Register resource {}", new.name());
                             }
-                            let res = Resource::make_resource(tables, &mut new, rest);
+                            let res = Resource::make_resource(tables, &mut new, rest, grouped);
                             get_mut_unchecked(from)
                                 .childs
                                 .insert(String::from(chunk), new);
@@ -418,8 +425,11 @@ impl Resource {
                         get_mut_unchecked(face)
                             .local_mappings
                             .insert(rid, nonwild_prefix.clone());
-                        face.primitives
-                            .decl_resource(rid, &nonwild_prefix.name().into());
+                        face.primitives.decl_resource(
+                            rid,
+                            &nonwild_prefix.name().into(),
+                            Grouped::disabled,
+                        );
                         rid
                     }
                 };
@@ -541,9 +551,9 @@ impl Resource {
         }
     }
 
-    pub fn upgrade_resource(res: &mut Arc<Resource>) {
+    pub fn upgrade_resource(res: &mut Arc<Resource>, grouped: Grouped) {
         if res.context.is_none() {
-            get_mut_unchecked(res).context = Some(ResourceContext::new());
+            get_mut_unchecked(res).context = Some(ResourceContext::new(grouped));
         }
     }
 }
@@ -554,6 +564,7 @@ pub fn register_resource(
     rid: ZInt,
     prefixid: ZInt,
     suffix: &str,
+    grouped: Grouped,
 ) {
     match tables.get_mapping(face, &prefixid).cloned() {
         Some(mut prefix) => match face.remote_mappings.get(&rid) {
@@ -563,7 +574,7 @@ pub fn register_resource(
                 }
             }
             None => {
-                let mut res = Resource::make_resource(tables, &mut prefix, suffix);
+                let mut res = Resource::make_resource(tables, &mut prefix, suffix, grouped);
                 Resource::match_resource(tables, &mut res);
                 let mut ctx = get_mut_unchecked(&mut res)
                     .session_ctxs
@@ -588,7 +599,8 @@ pub fn register_resource(
                         .local_mappings
                         .insert(local_rid, res.clone());
 
-                    face.primitives.decl_resource(local_rid, &res.name().into());
+                    face.primitives
+                        .decl_resource(local_rid, &res.name().into(), grouped);
                 }
 
                 get_mut_unchecked(face)

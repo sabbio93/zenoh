@@ -456,7 +456,7 @@ impl Session {
                 None => {
                     let rid = state.rid_counter.fetch_add(1, Ordering::SeqCst) as ZInt;
                     //let mut res = Resource::new(resname.clone());
-                    let mut res = Resource::createWGroup(resname.clone(), grouped);
+                    let mut res = Resource::createWGroup(resname.clone(), grouped.clone());
 
                     for sub in state.subscribers.values() {
                         if rname::matches(&resname, &sub.resname) {
@@ -468,7 +468,7 @@ impl Session {
 
                     let primitives = state.primitives.as_ref().unwrap().clone();
                     drop(state);
-                    primitives.decl_resource(rid, &resource);
+                    primitives.decl_resource(rid, &resource, grouped);
 
                     rid
                 }
@@ -1250,7 +1250,7 @@ impl Session {
 }
 
 impl Primitives for Session {
-    fn decl_resource(&self, rid: ZInt, reskey: &ResKey) {
+    fn decl_resource(&self, rid: ZInt, reskey: &ResKey, grouped: Grouped) {
         trace!("recv Decl Resource {} {:?}", rid, reskey);
         let state = &mut zwrite!(self.state);
         match state.remotekey_to_resname(reskey) {

@@ -16,6 +16,7 @@ use super::protocol::proto::{
 };
 use super::Primitives;
 use crate::net::link::Link;
+use crate::net::routing::router::Grouped;
 use crate::net::transport::TransportPeerEventHandler;
 use std::any::Any;
 use zenoh_util::core::{ZError, ZErrorKind, ZResult};
@@ -38,7 +39,8 @@ impl<P: 'static + Primitives> TransportPeerEventHandler for DeMux<P> {
                 for declaration in declarations {
                     match declaration {
                         Declaration::Resource(r) => {
-                            self.primitives.decl_resource(r.rid, &r.key);
+                            self.primitives
+                                .decl_resource(r.rid, &r.key, Grouped::disabled);
                         }
                         Declaration::Publisher(p) => {
                             self.primitives.decl_publisher(&p.key, msg.routing_context);

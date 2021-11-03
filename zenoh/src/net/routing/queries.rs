@@ -18,6 +18,8 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use zenoh_util::sync::get_mut_unchecked;
 
+use crate::net::routing::router::Grouped;
+
 use super::protocol::core::{
     queryable, rname, PeerId, QueryConsolidation, QueryTarget, QueryableInfo, ResKey, Target,
     WhatAmI, ZInt,
@@ -358,7 +360,7 @@ pub fn declare_router_queryable(
 ) {
     match tables.get_mapping(face, &prefixid).cloned() {
         Some(mut prefix) => {
-            let mut res = Resource::make_resource(tables, &mut prefix, suffix);
+            let mut res = Resource::make_resource(tables, &mut prefix, suffix, Grouped::disabled);
             Resource::match_resource(tables, &mut res);
             register_router_queryable(tables, Some(face), &mut res, kind, qabl_info, router);
 
@@ -410,7 +412,7 @@ pub fn declare_peer_queryable(
     match tables.get_mapping(face, &prefixid).cloned() {
         Some(mut prefix) => {
             let mut face = Some(face);
-            let mut res = Resource::make_resource(tables, &mut prefix, suffix);
+            let mut res = Resource::make_resource(tables, &mut prefix, suffix, Grouped::disabled);
             Resource::match_resource(tables, &mut res);
             register_peer_queryable(tables, face.as_deref(), &mut res, kind, qabl_info, peer);
 
@@ -476,7 +478,7 @@ pub fn declare_client_queryable(
 ) {
     match tables.get_mapping(face, &prefixid).cloned() {
         Some(mut prefix) => {
-            let mut res = Resource::make_resource(tables, &mut prefix, suffix);
+            let mut res = Resource::make_resource(tables, &mut prefix, suffix, Grouped::disabled);
             Resource::match_resource(tables, &mut res);
 
             register_client_queryable(tables, face, &mut res, kind, qabl_info);

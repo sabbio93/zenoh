@@ -1,3 +1,5 @@
+use crate::net::routing::router::Grouped;
+
 //
 // Copyright (c) 2017, 2020 ADLINK Technology Inc.
 //
@@ -35,7 +37,7 @@ impl Mux {
 }
 
 impl Primitives for Mux {
-    fn decl_resource(&self, rid: ZInt, reskey: &ResKey) {
+    fn decl_resource(&self, rid: ZInt, reskey: &ResKey, grouped: Grouped) {
         let d = Declaration::Resource(Resource {
             rid,
             key: reskey.to_owned(),

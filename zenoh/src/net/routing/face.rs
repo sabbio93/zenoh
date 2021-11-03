@@ -164,10 +164,17 @@ pub struct Face {
 }
 
 impl Primitives for Face {
-    fn decl_resource(&self, rid: ZInt, reskey: &ResKey) {
+    fn decl_resource(&self, rid: ZInt, reskey: &ResKey, grouped: Grouped) {
         let (prefixid, suffix) = reskey.into();
         let mut tables = zwrite!(self.tables);
-        register_resource(&mut tables, &mut self.state.clone(), rid, prefixid, suffix);
+        register_resource(
+            &mut tables,
+            &mut self.state.clone(),
+            rid,
+            prefixid,
+            suffix,
+            grouped,
+        );
     }
 
     fn forget_resource(&self, rid: ZInt) {
