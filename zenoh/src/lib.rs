@@ -96,6 +96,7 @@ pub mod query;
 pub mod queryable;
 pub mod subscriber;
 pub mod utils;
+pub mod LB;
 
 /// Some zenoh buffers.
 pub mod buf {

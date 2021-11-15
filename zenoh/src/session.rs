@@ -107,7 +107,7 @@ impl SessionState {
     }
 
     #[inline]
-    fn get_res(&self, rid: &ResourceId, local: bool) -> Option<&Resource> {
+    pub fn get_res(&self, rid: &ResourceId, local: bool) -> Option<&Resource> {
         if local {
             self.get_local_res(rid)
         } else {

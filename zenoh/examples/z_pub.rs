@@ -37,6 +37,9 @@ async fn main() {
         sleep(Duration::from_secs(1)).await;
         let buf = format!("[{:4}] {}", idx, value);
         println!("Put Data ('{}': '{}')", rid, buf);
+
+        zenoh::LB::publish(&session,&rid,"ciao");
+
         session.put(rid, buf).await.unwrap();
     }
 }
