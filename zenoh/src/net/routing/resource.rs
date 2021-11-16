@@ -49,7 +49,7 @@ pub(super) struct SessionContext {
 
 pub(super) struct ResourceContext {
     pub(super) router_subs: HashSet<PeerId>,
-    pub(super) peer_subs: HashSet<PeerId>,
+    pub(crate) peer_subs: HashSet<PeerId>,
     pub(super) router_qabls: HashMap<(PeerId, ZInt), QueryableInfo>,
     pub(super) peer_qabls: HashMap<(PeerId, ZInt), QueryableInfo>,
     pub(super) matches: Vec<Weak<Resource>>,

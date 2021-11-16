@@ -11,58 +11,59 @@
 // Contributors:
 //   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 //
+use async_std::task::sleep;
 use clap::{App, Arg};
-use futures::prelude::*;
-use futures::select;
+use std::time::Duration;
 use zenoh::prelude::*;
-use zenoh::LB::LoadBalancer;
 
 #[async_std::main]
 async fn main() {
     // Initiate logging
     env_logger::init();
 
-    let (config, selector) = parse_args();
+    let (config, path, value) = parse_args();
 
     println!("Open session");
-    let session = zenoh::open(config.clone()).await.unwrap();
+    let session = zenoh::open(config).await.unwrap();
 
-    println!("Register Subscriber on {}", selector);
+    let path = "/demo/example/77BADD9D4C7942B2A69C70E655BFAA08".to_string();
+    print!("Register Resource {}", path);
+    let rid = session.register_resource(&path).await.unwrap();
+    println!(" => RId {}", rid);
 
-    let mut subscriber = session.subscribe(&selector).await.unwrap();
+    println!("Register Publisher on {}", rid);
+    let _publisher = session.publishing(rid).await.unwrap();
 
-    let mut stdin = async_std::io::stdin();
-    let mut input = [0_u8];
-    loop {
-        select!(
-            sample = subscriber.receiver().next() => {
-                let sample = sample.unwrap();
-                println!(">> [Subscriber] Received {} ('{}': '{}')",
-                    sample.kind, sample.res_name, String::from_utf8_lossy(&sample.value.payload.contiguous()));
-            },
+    for idx in 0..u32::MAX {
+        sleep(Duration::from_secs(1)).await;
+        let buf = format!("[{:4}] {}", idx, value);
+        println!("Put Data ('{}': '{}')", rid, buf);
 
-            _ = stdin.read_exact(&mut input).fuse() => {
-                if input[0] == b'q' {break}
-            }
-        );
+        zenoh::LB::publish(&session, rid, "ciao").await;
+
+        session.put(rid, buf).await.unwrap();
     }
 }
 
-fn parse_args() -> (Properties, String) {
-    let args = App::new("zenoh sub example")
+fn parse_args() -> (Properties, String, String) {
+    let args = App::new("zenoh pub example")
         .arg(
-            Arg::from_usage("-m, --mode=[MODE]  'The zenoh session mode (peer by default).")
+            Arg::from_usage("-m, --mode=[MODE] 'The zenoh session mode (peer by default).")
                 .possible_values(&["peer", "client"]),
         )
         .arg(Arg::from_usage(
-            "-e, --peer=[LOCATOR]...   'Peer locators used to initiate the zenoh session.'",
+            "-e, --peer=[LOCATOR]...  'Peer locators used to initiate the zenoh session.'",
         ))
         .arg(Arg::from_usage(
             "-l, --listener=[LOCATOR]...   'Locators to listen on.'",
         ))
         .arg(
-            Arg::from_usage("-s, --selector=[SELECTOR] 'The selection of resources to subscribe'")
-                .default_value("/demo/example/**"),
+            Arg::from_usage("-p, --path=[PATH]        'The name of the resource to publish.'")
+                .default_value("/demo/example/zenoh-rs-pub"),
+        )
+        .arg(
+            Arg::from_usage("-v, --value=[VALUE]      'The value of the resource to publish.'")
+                .default_value("Pub from Rust!"),
         )
         .arg(Arg::from_usage(
             "-c, --config=[FILE]      'A configuration file.'",
@@ -83,7 +84,8 @@ fn parse_args() -> (Properties, String) {
         config.insert("multicast_scouting".to_string(), "false".to_string());
     }
 
-    let selector = args.value_of("selector").unwrap().to_string();
+    let path = args.value_of("path").unwrap();
+    let value = args.value_of("value").unwrap();
 
-    (config, selector)
+    (config, path.to_string(), value.to_string())
 }

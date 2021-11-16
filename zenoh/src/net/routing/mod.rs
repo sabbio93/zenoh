@@ -16,6 +16,7 @@ pub mod network;
 pub mod pubsub;
 pub mod queries;
 pub mod resource;
+pub mod rlb;
 pub mod router;
 
 use super::link;

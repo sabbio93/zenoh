@@ -49,7 +49,7 @@ pub struct RuntimeState {
 
 #[derive(Clone)]
 pub struct Runtime {
-    state: Arc<RuntimeState>,
+    pub state: Arc<RuntimeState>,
 }
 
 impl std::ops::Deref for Runtime {

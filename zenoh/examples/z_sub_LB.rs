@@ -24,18 +24,15 @@ async fn main() {
 
     let (config, selector) = parse_args();
 
-    println!("Open session");
-    let session = zenoh::open(config.clone()).await.unwrap();
+    let a = zenoh::LB::LoadBalancer::new(config).await;
 
-    println!("Register Subscriber on {}", selector);
-
-    let mut subscriber = session.subscribe(&selector).await.unwrap();
+    let mut subs = a.subscribe("/demo/example".to_string()).await;
 
     let mut stdin = async_std::io::stdin();
     let mut input = [0_u8];
     loop {
         select!(
-            sample = subscriber.receiver().next() => {
+            sample = subs.receiver().next() => {
                 let sample = sample.unwrap();
                 println!(">> [Subscriber] Received {} ('{}': '{}')",
                     sample.kind, sample.res_name, String::from_utf8_lossy(&sample.value.payload.contiguous()));

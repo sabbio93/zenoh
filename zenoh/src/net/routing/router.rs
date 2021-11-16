@@ -237,7 +237,7 @@ impl Tables {
 }
 
 pub struct Router {
-    whatami: WhatAmI,
+    pub whatami: WhatAmI,
     pub tables: Arc<RwLock<Tables>>,
 }
 
