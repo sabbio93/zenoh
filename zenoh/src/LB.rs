@@ -1,3 +1,4 @@
+use log::debug;
 use rand::Rng;
 use zenoh_util::properties::Properties;
 
@@ -17,7 +18,7 @@ use crate::subscriber::Subscriber;
 use crate::{open, Session};
 use futures::*;
 use std::borrow::Borrow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 //->Writer<'a>
 pub async fn publish<'a, ResourceId, IntoValue>(
@@ -46,73 +47,94 @@ pub async fn publish<'a, ResourceId, IntoValue>(
     // &session.put(rid, value).await.unwrap();
 }
 
+use std::cell::RefCell;
 pub struct LoadBalancer {
     zenoh_session: Session,
-    resources: HashMap<u64, Vec<String>>,
+    registered_sub_resources: RefCell<HashMap<String, u64>>, // TODO: CAMBIARE IN ARC MUTEX
     blres: BalancedResources,
 }
 
 impl LoadBalancer {
     pub async fn new(config: Properties) -> LoadBalancer {
         let zenoh_session = open(config).await.unwrap();
-
         LoadBalancer {
             zenoh_session,
-            resources: HashMap::new(),
+            registered_sub_resources: RefCell::new(HashMap::new()),
             blres: BalancedResources::new(),
         }
     }
 
     async fn register_resource(&self, path: String) -> u64 {
-        self.zenoh_session
-            .register_resource(&path)
-            .await
-            .unwrap()
-            .clone()
+        let rid = self.zenoh_session.register_resource(&path).await.unwrap();
+        for peerid in &self.get_peers_id().await {
+            let subres = format!("{}/{}", path, peerid);
+            let subresid = self.zenoh_session.register_resource(&subres).await.unwrap();
+            self.registered_sub_resources
+                .borrow_mut()
+                .insert(subres.clone(), subresid);
+        }
+        rid
     }
 
-    pub async fn publish<'a, IntoValue>(&'a self, path: String, value: IntoValue) -> Writer<'a>
+    async fn get_peers_id(&self) -> Vec<PeerId> {
+        let hh = &self
+            .zenoh_session
+            .runtime
+            .state
+            .router
+            .tables
+            .try_read()
+            .unwrap()
+            .peer_subs;
+
+        get_subs_id(hh)
+    }
+
+    pub async fn publish<'a, IntoValue>(
+        &'a self,
+        path: String,
+        value: IntoValue,
+    ) -> Option<Writer<'a>>
     where
         IntoValue: Into<Value>,
     {
-        let rid = self.zenoh_session.register_resource(&path).await.unwrap();
-        println!("register rid:{}", rid);
-        let patha = format!("{}/{}", path, "choosen");
-        let rida = &self.zenoh_session.register_resource(&patha).await.unwrap();
-        println!("register rid:{}", rida);
+        //let choosen = self.get_peers_id().await.get(0).unwrap().clone();
+        let peers = &self.get_peers_id().await;
+        let choosen = choose_peer(peers);
+        if choosen.is_none() {
+            None
+        } else {
+            let choosen = choosen.unwrap();
+            let pathsub = format!("{}/{}", path, choosen);
+            debug!("publish to {}", pathsub.clone());
 
-        let peers: Vec<PeerId>;
-        {
-            let hh = &self
-                .zenoh_session
-                .runtime
-                .state
-                .router
-                .tables
-                .try_read()
-                .unwrap()
-                .peer_subs;
+            if !self
+                .registered_sub_resources
+                .borrow()
+                .contains_key(&pathsub)
+            {
+                let subresid = self
+                    .zenoh_session
+                    .register_resource(&pathsub)
+                    .await
+                    .unwrap();
+                self.registered_sub_resources
+                    .borrow_mut()
+                    .insert(pathsub.clone(), subresid);
+                let _pub = self.zenoh_session.publishing(subresid).await.unwrap();
 
-            peers = get_subs_id(hh);
+                Some(self.zenoh_session.put(subresid, value))
+            } else {
+                let subresid = self
+                    .registered_sub_resources
+                    .borrow()
+                    .get(&pathsub)
+                    .unwrap()
+                    .clone();
+                let _pub = self.zenoh_session.publishing(subresid).await.unwrap();
+                Some(self.zenoh_session.put(subresid, value))
+            }
         }
-
-        //let peers = &self.blres.get_subs_per_res(rid);
-        println!("register rid:{}, peerslen{}", rid, peers.len());
-
-        let choosen = peers.get(0).unwrap();
-        let pathsub = format!("{}/{}", path, choosen);
-        println!("publish to {}", pathsub.clone());
-
-        let ridsub = self
-            .zenoh_session
-            .register_resource(&pathsub)
-            .await
-            .unwrap();
-        // println!("number of registerd resources:{}", h.len());
-        println!("register rid:{}", ridsub);
-        let _pub = self.zenoh_session.publishing(ridsub).await.unwrap();
-
-        self.zenoh_session.put(ridsub, value)
     }
 
     pub async fn subscribe(&self, path: String) -> Subscriber<'_> {
@@ -122,5 +144,18 @@ impl LoadBalancer {
         let mypid = self.zenoh_session.runtime.pid;
         let pathsub = format!("{}/{}", path, mypid);
         self.zenoh_session.subscribe(&pathsub).await.unwrap()
+    }
+}
+
+fn choose_peer(peers: &Vec<PeerId>) -> Option<&PeerId> {
+    let len = peers.len();
+    match len {
+        0 => None,
+        1 => peers.get(0),
+        _ => {
+            let mut rng = rand::thread_rng();
+            let choosen = rng.gen_range(0..len);
+            peers.get(choosen)
+        }
     }
 }

@@ -24,11 +24,14 @@ async fn main() {
     let (config, path, value) = parse_args();
 
     let bal = zenoh::LB::LoadBalancer::new(config).await;
-    let published = bal
-        .publish("/demo/example".to_string(), "nuai")
-        .await
-        .await
-        .unwrap();
+    for i in (1..10000) {
+        //sleep(Duration::from_secs(1)).await;
+        let value = format!("ciao{}", i);
+        let published = bal.publish("/demo/example".to_string(), value).await;
+        if published.is_some() {
+            published.unwrap().await;
+        }
+    }
 }
 
 fn parse_args() -> (Properties, String, String) {
