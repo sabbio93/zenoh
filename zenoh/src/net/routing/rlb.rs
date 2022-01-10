@@ -10,9 +10,9 @@ pub fn myprint(res: &HashSet<Arc<Resource>>) {
     for rs in res {
         let mut m = &rs.context.as_ref().unwrap().peer_subs;
         for sub in m {
-            println!("peerid:{}", sub);
+            log::debug!("peerid:{}", sub);
         }
-        println!("ns:{}", m.len());
+        log::debug!("ns:{}", m.len());
     }
 }
 
@@ -22,9 +22,9 @@ pub fn get_subs_id(res: &HashSet<Arc<Resource>>) -> Vec<PeerId> {
         let mut m = &rs.context.as_ref().unwrap().peer_subs;
         for sub in m {
             ids.push(sub.clone());
-            println!("peerid:{}", sub);
+            log::debug!("peerid:{}", sub);
         }
-        println!("ns:{}", m.len());
+        log::debug!("ns:{}", m.len());
     }
 
     ids
@@ -49,7 +49,7 @@ impl BalancedResources {
         let mut m = &rs.context.as_ref().unwrap().peer_subs;
         for sub in m {
             ids.push(sub);
-            println!("peerid:{}", sub);
+            log::debug!("peerid:{}", sub);
         }
 
         ids
