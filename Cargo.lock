@@ -3190,7 +3190,6 @@ dependencies = [
  "bincode",
  "clap",
  "criterion",
- "env_logger",
  "event-listener",
  "flume",
  "futures",
